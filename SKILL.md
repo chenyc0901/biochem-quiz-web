@@ -14,6 +14,35 @@ type: project
 
 ---
 
+## 從 GitHub Clone 重建開發環境
+
+GitHub 備份：https://github.com/chenyc0901/biochem-quiz-web
+
+```bash
+# 1. clone 程式碼
+git clone https://github.com/chenyc0901/biochem-quiz-web.git
+cd biochem-quiz-web
+
+# 2. 安裝依賴
+npm install
+
+# 3. 連回 Vercel 專案（會建立 .vercel/project.json）
+vercel link --project biochem-quiz-web
+
+# 4. 拉環境變數（會建立 .env.local，包含 DATABASE_URL / OAuth / OpenAI key）
+vercel env pull .env.local --environment production
+
+# 5. 產生 Prisma Client（連到正式 DB）
+npx prisma generate
+
+# 6. 啟動本機開發
+npm run dev    # → http://localhost:3000
+```
+
+⚠️ **不要 commit `.env.local` / `.vercel/`**，已被 `.gitignore` 排除。
+
+---
+
 ## 快速指令
 
 ```bash
@@ -33,6 +62,11 @@ npx prisma db push                                      # 推 schema 變更
 npx prisma db pull                                      # 從現有 DB 反向產出 schema
 npx prisma generate                                     # 產生 Prisma Client
 npx prisma studio                                       # 視覺化 DB 管理（localhost:5555）
+
+# Git / GitHub 備份
+git status                                              # 看本機變更
+git add -A && git commit -m "..."                       # 提交
+git push                                                # 推到 origin/main（GitHub）
 ```
 
 ---
