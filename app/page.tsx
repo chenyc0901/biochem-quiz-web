@@ -1,65 +1,187 @@
-import Image from "next/image";
+import Link from "next/link";
+import { auth, signOut } from "@/auth";
+import { generateSeed } from "@/lib/questions";
+import { isAdminEmail } from "@/lib/admin";
+import { prisma } from "@/lib/prisma";
+import ResumeBanner from "./_components/ResumeBanner";
 
-export default function Home() {
+export const dynamic = "force-dynamic";
+
+export default async function Home() {
+  const session = await auth();
+  const email = session?.user?.email ?? null;
+  const seed = generateSeed();
+
+  // Look for an in-progress practice session to offer "resume"
+  let resume:
+    | { seed: string; answered: number; lastAt: Date | null }
+    | null = null;
+  if (email) {
+    const recent = await prisma.attempts.groupBy({
+      by: ["exam_seed"],
+      where: { user_email: email, exam_seed: { startsWith: "p_" } },
+      _count: { _all: true },
+      _max: { created_at: true },
+      orderBy: { _max: { created_at: "desc" } },
+      take: 5,
+    });
+    const unfinished = recent.find(
+      (r) => r._count._all > 0 && r._count._all < 80,
+    );
+    if (unfinished?.exam_seed) {
+      resume = {
+        seed: unfinished.exam_seed.replace(/^p_/, ""),
+        answered: unfinished._count._all,
+        lastAt: unfinished._max.created_at,
+      };
+    }
+  }
+
   return (
-    <div className="flex flex-col flex-1 items-center justify-center bg-zinc-50 font-sans dark:bg-black">
-      <main className="flex flex-1 w-full max-w-3xl flex-col items-center justify-between py-32 px-16 bg-white dark:bg-black sm:items-start">
-        <Image
-          className="dark:invert"
-          src="/next.svg"
-          alt="Next.js logo"
-          width={100}
-          height={20}
-          priority
+    <main>
+      <div className="topbar">
+        <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+          <div>
+            <h1 style={{ margin: 0, fontSize: 18 }}>中國醫藥大學-醫技系</h1>
+            <div style={{ fontSize: 14, fontWeight: 600, marginTop: 2 }}>
+              臨床生化／生化國考題庫練習
+            </div>
+          </div>
+        </div>
+        {email ? (
+          <div
+            className="row"
+            style={{ gap: 6, flexWrap: "wrap", justifyContent: "flex-end" }}
+          >
+            <Link
+              className="btn btn-ghost"
+              href="/history"
+              style={{ fontSize: 13, padding: "8px 12px" }}
+            >
+              📊 作答紀錄
+            </Link>
+            <Link
+              className="btn btn-ghost"
+              href="/wrong-questions"
+              style={{ fontSize: 13, padding: "8px 12px" }}
+            >
+              ❌ 錯題練習
+            </Link>
+            {isAdminEmail(email) && (
+              <Link
+                className="btn btn-ghost"
+                href="/admin"
+                style={{
+                  fontSize: 13,
+                  padding: "8px 12px",
+                  borderColor: "#7c3aed44",
+                }}
+              >
+                ⚙️ 後台
+              </Link>
+            )}
+            <span
+              className="muted"
+              style={{
+                fontSize: 11,
+                maxWidth: 160,
+                overflow: "hidden",
+                textOverflow: "ellipsis",
+                whiteSpace: "nowrap",
+              }}
+              title={email}
+            >
+              {email}
+            </span>
+            <form
+              action={async () => {
+                "use server";
+                await signOut({ redirectTo: "/" });
+              }}
+            >
+              <button
+                type="submit"
+                className="btn btn-ghost"
+                style={{ fontSize: 13, padding: "8px 12px" }}
+              >
+                登出
+              </button>
+            </form>
+          </div>
+        ) : (
+          <Link className="btn btn-secondary" href="/login">
+            Google 登入
+          </Link>
+        )}
+      </div>
+
+      {resume && (
+        <ResumeBanner
+          seed={resume.seed}
+          answered={resume.answered}
+          lastAtIso={resume.lastAt ? resume.lastAt.toISOString() : null}
         />
-        <div className="flex flex-col items-center gap-6 text-center sm:items-start sm:text-left">
-          <h1 className="max-w-xs text-3xl font-semibold leading-10 tracking-tight text-black dark:text-zinc-50">
-            To get started, edit the page.tsx file.
-          </h1>
-          <p className="max-w-md text-lg leading-8 text-zinc-600 dark:text-zinc-400">
-            Looking for a starting point or more instructions? Head over to{" "}
-            <a
-              href="https://vercel.com/templates?framework=next.js&utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-              className="font-medium text-zinc-950 dark:text-zinc-50"
+      )}
+
+      <div className="card grid">
+        <div className="mode-cards">
+          <div className="mode-card">
+            <div
+              style={{
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "space-between",
+              }}
             >
-              Templates
-            </a>{" "}
-            or the{" "}
-            <a
-              href="https://nextjs.org/learn?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-              className="font-medium text-zinc-950 dark:text-zinc-50"
+              <div className="mode-title" style={{ lineHeight: 1 }}>
+                練習模式
+              </div>
+              <span className="mode-icon">📝</span>
+            </div>
+            <ul className="mode-list">
+              <li>作答後立即顯示對錯</li>
+              <li>可隨時跳題複習</li>
+              <li>顯示修正附註</li>
+              <li>可使用 AI 解釋功能</li>
+            </ul>
+            <Link
+              className="btn btn-primary"
+              style={{ width: "100%", textAlign: "center" }}
+              href={`/exam?seed=${seed}&mode=practice`}
             >
-              Learning
-            </a>{" "}
-            center.
-          </p>
+              練習模式
+            </Link>
+          </div>
+          <div className="mode-card mode-card-exam">
+            <div
+              style={{
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "space-between",
+              }}
+            >
+              <div className="mode-title" style={{ lineHeight: 1 }}>
+                考試模式
+              </div>
+              <span className="mode-icon">🎯</span>
+            </div>
+            <ul className="mode-list">
+              <li>選完自動跳下一題</li>
+              <li>不顯示即時對錯</li>
+              <li>交卷後才顯示成績</li>
+              <li>模擬真實考試情境</li>
+            </ul>
+            <Link
+              className="btn btn-exam"
+              style={{ width: "100%", textAlign: "center" }}
+              href={`/exam?seed=${seed}&mode=exam`}
+            >
+              考試模式
+            </Link>
+          </div>
         </div>
-        <div className="flex flex-col gap-4 text-base font-medium sm:flex-row">
-          <a
-            className="flex h-12 w-full items-center justify-center gap-2 rounded-full bg-foreground px-5 text-background transition-colors hover:bg-[#383838] dark:hover:bg-[#ccc] md:w-[158px]"
-            href="https://vercel.com/new?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            <Image
-              className="dark:invert"
-              src="/vercel.svg"
-              alt="Vercel logomark"
-              width={16}
-              height={16}
-            />
-            Deploy Now
-          </a>
-          <a
-            className="flex h-12 w-full items-center justify-center rounded-full border border-solid border-black/[.08] px-5 transition-colors hover:border-transparent hover:bg-black/[.04] dark:border-white/[.145] dark:hover:bg-[#1a1a1a] md:w-[158px]"
-            href="https://nextjs.org/docs?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            Documentation
-          </a>
-        </div>
-      </main>
-    </div>
+      </div>
+
+    </main>
   );
 }

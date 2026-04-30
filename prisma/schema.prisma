@@ -1,0 +1,55 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model ai_explanations {
+  question_id   String    @id
+  prompt        String
+  response_text String
+  provider      String?
+  created_at    DateTime? @default(now()) @db.Timestamptz(6)
+}
+
+model attempts {
+  id              BigInt    @id @default(autoincrement())
+  user_email      String?
+  exam_seed       String?
+  question_id     String
+  selected_answer String?
+  correct_answer  String?
+  is_correct      Int?
+  guessed         Int?      @default(0)
+  created_at      DateTime? @default(now()) @db.Timestamptz(6)
+}
+
+model exam_sessions {
+  exam_seed       String    @id
+  user_email      String?
+  elapsed_seconds Int?
+  created_at      DateTime? @default(now()) @db.Timestamptz(6)
+}
+
+model question_explanations {
+  question_id        String    @id
+  answer_text        String?
+  reason_text        String?
+  wrong_options_text String?
+  key_point_text     String?
+  source_text        String?
+  status             String?   @default("draft")
+  created_at         DateTime? @default(now()) @db.Timestamptz(6)
+  updated_at         DateTime? @default(now()) @db.Timestamptz(6)
+}
+
+model question_reports {
+  id          BigInt    @id @default(autoincrement())
+  question_id String?
+  user_email  String?
+  content     String
+  created_at  DateTime? @default(now()) @db.Timestamptz(6)
+}
